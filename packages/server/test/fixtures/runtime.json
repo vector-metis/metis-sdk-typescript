@@ -1,0 +1,28 @@
+{
+  "environment": {
+    "METIS_PLATFORM_ENDPOINT": "http://metis.internal",
+    "METIS_APP_ID": "caller-a7x2m",
+    "METIS_APP_TOKEN": "app-token",
+    "METIS_LLM_0_ENDPOINT": "http://metis.internal/api/model-gateway",
+    "METIS_LLM_0_MODEL": "example-chat",
+    "METIS_LLM_0_API_KEY": "model-token",
+    "METIS_S3_ENDPOINT": "http://silo.internal",
+    "METIS_S3_ACCESS_KEY": "app-access",
+    "METIS_S3_SECRET_KEY": "app-secret",
+    "METIS_S3_BUCKET": "caller-a7x2m",
+    "METIS_S3_SHARED_BUCKETS": "[\"shared-assets\"]"
+  },
+  "trustedHeaders": {
+    "X-Platform-Tenant-Id": "42",
+    "X-Platform-User-Id": "7",
+    "X-Platform-Role": "member",
+    "X-Platform-Source-App-Id": "caller-a7x2m",
+    "X-Platform-Actor-Type": "service"
+  },
+  "dependencies": {
+    "dependencies": [
+      {"appId":"web-dependency-a7x2m","alias":"ui","required":true,"appType":"RUNTIME_APPLICATION_TYPE_WEB","available":true,"webBasePath":"/apps/web-dependency-a7x2m"}
+    ]
+  },
+  "endpoint": {"appId":"service-dependency-a7x2m","endpointName":"database","protocol":"RUNTIME_ENDPOINT_PROTOCOL_TCP","host":"127.0.0.1","port":31001,"available":true}
+}

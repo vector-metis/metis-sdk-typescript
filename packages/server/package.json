@@ -1,0 +1,26 @@
+{
+  "name": "@vector-metis/server-sdk",
+  "version": "0.1.0",
+  "description": "Metis application backend runtime SDK",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "tsc -p tsconfig.json && node --test test/sdk.test.mjs",
+    "pack": "pnpm build && pnpm pack"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "devDependencies": {
+    "typescript": "5.9.3"
+  }
+}
