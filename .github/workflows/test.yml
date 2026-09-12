@@ -33,5 +33,6 @@ jobs:
           smoke_dir="$(mktemp -d)"
           printf '{"name":"sdk-smoke","private":true,"type":"module"}\n' > "$smoke_dir/package.json"
           npm install --prefix "$smoke_dir" --ignore-scripts --no-audit --no-fund "$pack_dir"/vector-metis-server-sdk-*.tgz "$pack_dir"/vector-metis-browser-sdk-*.tgz
+          cd "$smoke_dir"
           node --input-type=module -e 'await import("@vector-metis/server-sdk"); await import("@vector-metis/browser-sdk");'
       - run: git diff --check
