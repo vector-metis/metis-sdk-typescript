@@ -1,26 +1,58 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { Metis, injected } from "../dist/index.js";
+import { init } from "../dist/index.js";
 
-test("delegates to the platform injected SDK", async () => {
-  const calls = [];
-  globalThis.window = { Metis: {
-    appURL: (path) => `/apps/current${path || ""}`,
-    getContext: async () => ({ appId: "current", appType: "RUNTIME_APPLICATION_TYPE_WEB", tenantId: "1", userId: "2", role: "member", actorType: "RUNTIME_ACTOR_TYPE_USER" }),
-    listDependencies: async () => [],
-    dependency: async (selector) => ({ appId: selector, alias: selector, required: true, appType: "RUNTIME_APPLICATION_TYPE_WEB", available: true, webBasePath: `/apps/${selector}` }),
-    dependencyURL: async (selector, path) => `/apps/${selector}${path || ""}`,
-    openAppPage: async (options) => calls.push(options),
-  } };
-  assert.equal(Metis.appURL("/home"), "/apps/current/home");
-  assert.equal((await Metis.dependency("target")).appId, "target");
-  await Metis.openAppPage({ app: "target", path: "/home" });
-  assert.deepEqual(calls, [{ app: "target", path: "/home" }]);
-  assert.equal(injected().appURL(), "/apps/current");
+const platformSDK = {
+  appURL: (path) => `/apps/current${path || ""}`,
+  getContext: async () => ({ appId: "current", appType: "RUNTIME_APPLICATION_TYPE_WEB", tenantId: "1", userId: "2", role: "member", actorType: "RUNTIME_ACTOR_TYPE_USER" }),
+  listDependencies: async () => [],
+  dependency: async (selector) => ({ appId: selector, alias: selector, required: true, appType: "RUNTIME_APPLICATION_TYPE_WEB", available: true, webBasePath: `/apps/${selector}` }),
+  dependencyURL: async (selector, path) => `/apps/${selector}${path || ""}`,
+  openAppPage: async () => {},
+};
+
+test("loads the platform script and returns the ready SDK", async () => {
+  const scripts = [];
+  globalThis.window = {};
+  globalThis.document = {
+    createElement: (tag) => {
+      assert.equal(tag, "script");
+      return {};
+    },
+    head: {
+      appendChild: (script) => {
+        scripts.push(script);
+        globalThis.window.Metis = platformSDK;
+        script.onload();
+      },
+    },
+  };
+
+  const sdk = await init({ nonce: "test-nonce" });
+  assert.equal(sdk, platformSDK);
+  assert.equal(scripts.length, 1);
+  assert.equal(scripts[0].src, "/api/runtime/v1/browser-sdk.js");
+  assert.equal(scripts[0].nonce, "test-nonce");
+  assert.equal(sdk.appURL("/home"), "/apps/current/home");
 });
 
-test("fails clearly when platform injection is missing", () => {
+test("reuses an already loaded platform SDK", async () => {
+  globalThis.window = { Metis: platformSDK };
+  globalThis.document = undefined;
+  assert.equal(await init(), platformSDK);
+});
+
+test("fails clearly outside a browser", async () => {
+  globalThis.window = undefined;
+  globalThis.document = undefined;
+  await assert.rejects(init(), /requires a browser environment/);
+});
+
+test("fails when the platform script cannot be loaded", async () => {
   globalThis.window = {};
-  assert.throws(() => injected(), /not injected/);
-  assert.throws(() => Metis.appURL(), /not injected/);
+  globalThis.document = {
+    createElement: () => ({}),
+    head: { appendChild: (script) => script.onerror() },
+  };
+  await assert.rejects(init({ timeoutMs: 1000 }), /Failed to load Metis browser SDK/);
 });

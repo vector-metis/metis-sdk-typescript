@@ -10,7 +10,13 @@ npm install @vector-metis/server-sdk
 npm install @vector-metis/browser-sdk
 ```
 
-两个包独立版本和发布，不复制平台服务端实现。浏览器包必须在平台注入 `/api/runtime/v1/browser-sdk.js` 后使用。
+两个包独立版本和发布，不复制平台服务端实现。浏览器包通过 `init()` 自动加载平台提供的 `/api/runtime/v1/browser-sdk.js`。
+
+```ts
+import { init } from "@vector-metis/browser-sdk";
+
+const Metis = await init();
+```
 
 ```bash
 pnpm install --frozen-lockfile

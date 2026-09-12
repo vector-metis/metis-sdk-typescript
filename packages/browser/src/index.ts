@@ -34,24 +34,94 @@ declare global {
   }
 }
 
-/** 返回平台已经注入的浏览器能力；脚本缺失时明确失败。 */
-export function injected(): InjectedBrowserSDK {
-  const sdk = globalThis.window?.Metis;
-  if (!sdk) {
-    throw new Error("Metis browser SDK is not injected; load /api/runtime/v1/browser-sdk.js first");
+export type BrowserSDKInitOptions = {
+  /** Same-origin by default; override for local development or a platform proxy. */
+  scriptUrl?: string;
+  /** Optional CSP nonce for the dynamically-created script element. */
+  nonce?: string;
+  /** Milliseconds to wait for the platform script before rejecting. */
+  timeoutMs?: number;
+};
+
+let initialization: Promise<InjectedBrowserSDK> | undefined;
+
+function validateSDK(value: unknown): InjectedBrowserSDK {
+  if (!value || typeof value !== "object") {
+    throw new Error("Metis browser SDK loaded without a valid window.Metis object");
   }
-  return sdk;
+  const sdk = value as Partial<InjectedBrowserSDK>;
+  const methods: Array<keyof InjectedBrowserSDK> = [
+    "appURL",
+    "getContext",
+    "listDependencies",
+    "dependency",
+    "dependencyURL",
+    "openAppPage",
+  ];
+  if (methods.some((method) => typeof sdk[method] !== "function")) {
+    throw new Error("Metis browser SDK loaded without the required platform methods");
+  }
+  return sdk as InjectedBrowserSDK;
 }
 
-/** 对平台注入能力做延迟解析的类型化代理。 */
-export const Metis: InjectedBrowserSDK = Object.freeze({
-  appURL: (path?: string) => injected().appURL(path),
-  getContext: () => injected().getContext(),
-  listDependencies: () => injected().listDependencies(),
-  dependency: (selector: string) => injected().dependency(selector),
-  dependencyURL: (selector: string, path?: string) => injected().dependencyURL(selector, path),
-  openAppPage: (options: { app: string; path?: string; query?: Record<string, string> }) => injected().openAppPage(options),
-});
+/** Load the platform-injected browser capabilities and return a ready SDK. */
+export function init(options: BrowserSDKInitOptions = {}): Promise<InjectedBrowserSDK> {
+  if (initialization) {
+    return initialization;
+  }
+
+  const browserWindow = globalThis.window;
+  const document = globalThis.document;
+  if (!browserWindow) {
+    return Promise.reject(new Error("Metis browser SDK requires a browser environment"));
+  }
+
+  if (browserWindow.Metis) {
+    return Promise.resolve(validateSDK(browserWindow.Metis));
+  }
+  if (!document) {
+    return Promise.reject(new Error("Metis browser SDK requires a browser document"));
+  }
+
+  const timeoutMs = options.timeoutMs ?? 10000;
+  const script = document.createElement("script");
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  let resolveInitialization!: (sdk: InjectedBrowserSDK) => void;
+  let rejectInitialization!: (error: Error) => void;
+  initialization = new Promise<InjectedBrowserSDK>((resolve, reject) => {
+    resolveInitialization = resolve;
+    rejectInitialization = reject;
+  });
+  const pending = initialization!;
+  const fail = (error: Error) => {
+    if (timer) clearTimeout(timer);
+    initialization = undefined;
+    rejectInitialization(error);
+  };
+
+  script.src = options.scriptUrl ?? "/api/runtime/v1/browser-sdk.js";
+  script.async = true;
+  if (options.nonce) script.nonce = options.nonce;
+  script.onload = () => {
+    try {
+      if (timer) clearTimeout(timer);
+      const sdk = validateSDK(browserWindow.Metis);
+      initialization = undefined;
+      resolveInitialization(sdk);
+    } catch (error) {
+      fail(error instanceof Error ? error : new Error(String(error)));
+    }
+  };
+  script.onerror = () => fail(new Error(`Failed to load Metis browser SDK: ${script.src}`));
+  timer = setTimeout(() => fail(new Error(`Metis browser SDK load timed out after ${timeoutMs}ms`)), timeoutMs);
+  try {
+    document.head.appendChild(script);
+  } catch (error) {
+    fail(error instanceof Error ? error : new Error(String(error)));
+  }
+
+  return pending;
+}
 
 export type MetisBrowserContext = BrowserContext;
 export type MetisBrowserSDK = InjectedBrowserSDK;

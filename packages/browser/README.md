@@ -8,17 +8,24 @@
 npm install @vector-metis/browser-sdk
 ```
 
-应用入口仍需先加载平台脚本：
-
-```html
-<script src="/api/runtime/v1/browser-sdk.js"></script>
-```
-
 ```ts
-import { Metis } from "@vector-metis/browser-sdk";
+import { init } from "@vector-metis/browser-sdk";
 
+const Metis = await init();
 const dependencies = await Metis.listDependencies();
 ```
+
+`init()` 会自动加载当前平台的 `/api/runtime/v1/browser-sdk.js`，并在脚本完成且能力校验通过后返回 SDK。重复调用会复用已经加载的 `window.Metis`。本地开发或严格 CSP 场景可以覆盖脚本地址、nonce 和超时时间：
+
+```ts
+const Metis = await init({
+  scriptUrl: "/api/runtime/v1/browser-sdk.js",
+  nonce: document.querySelector("meta[name=csp-nonce]")?.content,
+  timeoutMs: 10000,
+});
+```
+
+请在浏览器应用启动阶段调用 `init()`；服务端渲染、Node.js 和构建阶段不提供浏览器环境。
 
 浏览器 SDK 不暴露应用令牌、模型 API key、对象存储凭据或 Service 端口。完整说明见[开发文档](https://github.com/vector-metis/metis-sdk-typescript#readme)。
 
