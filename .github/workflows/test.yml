@@ -24,4 +24,14 @@ jobs:
       - run: pnpm -r build
       - run: pnpm --filter @vector-metis/server-sdk pack --dry-run
       - run: pnpm --filter @vector-metis/browser-sdk pack --dry-run
+      - name: Install packed SDKs in a clean project
+        run: |
+          set -euo pipefail
+          pack_dir="$(mktemp -d)"
+          pnpm --filter @vector-metis/server-sdk pack --pack-destination "$pack_dir"
+          pnpm --filter @vector-metis/browser-sdk pack --pack-destination "$pack_dir"
+          smoke_dir="$(mktemp -d)"
+          printf '{"name":"sdk-smoke","private":true,"type":"module"}\n' > "$smoke_dir/package.json"
+          npm install --prefix "$smoke_dir" --ignore-scripts --no-audit --no-fund "$pack_dir"/vector-metis-server-sdk-*.tgz "$pack_dir"/vector-metis-browser-sdk-*.tgz
+          node --input-type=module -e 'await import("@vector-metis/server-sdk"); await import("@vector-metis/browser-sdk");'
       - run: git diff --check
