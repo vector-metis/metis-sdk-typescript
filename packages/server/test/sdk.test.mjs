@@ -20,6 +20,10 @@ test("shared contract, cache, refresh and capability config", async () => {
   assert.equal(calls, 2);
   assert.equal((await client.serviceEndpoint("data", "database")).port, 31001);
   assert.equal(client.model("llm.0").model, "example-chat");
+  assert.equal(client.model("embedding.0").model, "example-embedding");
+  assert.equal(client.model("embedding.0").values.DIMENSIONS, "1024");
+  assert.equal(client.model("rerank.0").model, "example-rerank");
+  assert.equal(client.model("rerank.0").values.MAX_DOCUMENTS, "64");
   assert.deepEqual(client.objectStorage().sharedBuckets, ["shared-assets"]);
   assert.equal(contextFromHeaders(fixture.trustedHeaders).tenantId, "42");
 });
