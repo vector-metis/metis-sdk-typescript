@@ -18,6 +18,9 @@ import { init } from "@vector-metis/browser-sdk";
 const Metis = await init();
 ```
 
+后端 `Dependency` 返回 `requestedVersion`、`resolvedVersion`、`packageSha256`、`direct`、
+`available` 和 `resolutionError`，应用应在使用可选依赖前检查 `available`。
+
 ```bash
 pnpm install --frozen-lockfile
 pnpm -r test

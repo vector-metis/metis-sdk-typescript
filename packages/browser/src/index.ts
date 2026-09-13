@@ -13,6 +13,11 @@ export interface WebDependency {
   appId: string;
   alias: string;
   required: boolean;
+  requestedVersion: string;
+  resolvedVersion: string;
+  packageSha256: string;
+  direct: boolean;
+  resolutionError: string;
   appType: "RUNTIME_APPLICATION_TYPE_WEB";
   available: boolean;
   webBasePath: string;

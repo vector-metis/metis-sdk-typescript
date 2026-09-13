@@ -1,8 +1,10 @@
 declare const process: { env: Record<string, string | undefined> } | undefined;
 
 export type Dependency = {
-  appId: string; alias: string; required: boolean; appType: string;
-  available: boolean; webBasePath: string;
+  appId: string; alias: string; required: boolean;
+  requestedVersion: string; resolvedVersion: string; packageSha256: string;
+  available: boolean; direct: boolean; resolutionError: string;
+  appType: string; webBasePath: string;
 };
 export type ServiceEndpoint = {
   appId: string; endpointName: string; protocol: string; host: string; port: number; available: boolean;

@@ -32,7 +32,7 @@
   },
   "dependencies": {
     "dependencies": [
-      {"appId":"web-dependency-a7x2m","alias":"ui","required":true,"appType":"RUNTIME_APPLICATION_TYPE_WEB","available":true,"webBasePath":"/apps/web-dependency-a7x2m"}
+      {"appId":"web-dependency-a7x2m","alias":"ui","required":true,"requestedVersion":"^1.2.0","resolvedVersion":"1.4.2","packageSha256":"sha256:web","available":true,"direct":true,"resolutionError":"","appType":"RUNTIME_APPLICATION_TYPE_WEB","webBasePath":"/apps/web-dependency-a7x2m"}
     ]
   },
   "endpoint": {"appId":"service-dependency-a7x2m","endpointName":"database","protocol":"RUNTIME_ENDPOINT_PROTOCOL_TCP","host":"127.0.0.1","port":31001,"available":true}

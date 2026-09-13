@@ -12,3 +12,6 @@
 ## 0.1.0
 
 - 首次公开发布。
+## 0.1.3
+
+- Expose dependency version, package SHA, directness, availability and resolution diagnostics in server and browser types.
