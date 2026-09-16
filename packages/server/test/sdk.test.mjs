@@ -19,11 +19,29 @@ test("shared contract, cache, refresh and capability config", async () => {
   await client.listDependencies(true);
   assert.equal(calls, 2);
   assert.equal((await client.serviceEndpoint("data", "database")).port, 31001);
-  assert.equal(client.model("llm.0").model, "example-chat");
-  assert.equal(client.model("embedding.0").model, "example-embedding");
-  assert.equal(client.model("embedding.0").values.DIMENSIONS, "1024");
+  const llm = client.model("llm.0");
+  assert.equal(llm.model, "example-chat");
+  assert.equal(llm.supportsVision, true);
+  assert.equal(llm.supportsThinking, false);
+  assert.equal(llm.supportsTools, true);
+  assert.equal(llm.contextWindow, 32768);
+  assert.equal(llm.maxOutputTokens, 8192);
+
+  assert.equal(client.tryModel("llm.0")?.model, "example-chat");
+  assert.equal(client.tryModel("llm.1"), null);
+  assert.equal(client.tryModel("invalid"), null);
+
+  const llms = client.models("llm");
+  assert.equal(llms.length, 1);
+  assert.equal(llms[0].model, "example-chat");
+  assert.throws(() => client.models("invalid"), (error) => error.reason === "INVALID_CONFIG");
+
+  const emb = client.model("embedding.0");
+  assert.equal(emb.model, "example-embedding");
+  assert.equal(emb.dimensions, 1024);
+  assert.equal(emb.normalized, true);
+
   assert.equal(client.model("rerank.0").model, "example-rerank");
-  assert.equal(client.model("rerank.0").values.MAX_DOCUMENTS, "64");
   assert.deepEqual(client.objectStorage().sharedBuckets, ["shared-assets"]);
   assert.equal(contextFromHeaders(fixture.trustedHeaders).tenantId, "42");
 });

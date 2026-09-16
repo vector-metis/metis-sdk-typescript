@@ -12,7 +12,19 @@ export type ServiceEndpoint = {
 export type RequestContext = {
   tenantId: string; userId: string; role: string; sourceAppId: string; actorType: string;
 };
-export type ModelConfig = { endpoint: string; model: string; apiKey: string; values: Record<string, string> };
+export type ModelConfig = {
+  endpoint: string;
+  model: string;
+  apiKey: string;
+  supportsVision: boolean;
+  supportsThinking: boolean;
+  supportsTools: boolean;
+  contextWindow: number;
+  maxInputTokens: number;
+  maxOutputTokens: number;
+  dimensions: number;
+  normalized: boolean;
+};
 export type ObjectStorageConfig = {
   endpoint: string; region: string; accessKey: string; secretKey: string; bucket: string; sharedBuckets: string[];
 };
@@ -70,14 +82,60 @@ export class Client {
   serviceEndpoint(selector: string, endpointName: string, refresh = false): Promise<ServiceEndpoint> {
     return this.get(this.path("dependencies", selector, "endpoints", endpointName), refresh);
   }
+  private parseModelSlot(slot: string): ModelConfig | null {
+    const match = /^(llm|embedding|rerank)\.(\d+)$/.exec(slot);
+    if (!match) return null;
+    const prefix = `METIS_${match[1].toUpperCase()}_${match[2]}_`;
+    const endpoint = this.env[`${prefix}ENDPOINT`];
+    const model = this.env[`${prefix}MODEL`];
+    const apiKey = this.env[`${prefix}API_KEY`];
+    if (!endpoint || !model || !apiKey) return null;
+
+    const toInt = (suffix: string) => {
+      const v = parseInt(this.env[`${prefix}${suffix}`] || "0", 10);
+      return Number.isNaN(v) ? 0 : v;
+    };
+    const toBool = (suffix: string) => (this.env[`${prefix}${suffix}`] || "").trim().toLowerCase() === "true";
+
+    return {
+      endpoint,
+      model,
+      apiKey,
+      supportsVision: toBool("SUPPORTS_VISION"),
+      supportsThinking: toBool("SUPPORTS_THINKING"),
+      supportsTools: toBool("SUPPORTS_TOOLS"),
+      contextWindow: toInt("CONTEXT_WINDOW"),
+      maxInputTokens: toInt("MAX_INPUT_TOKENS"),
+      maxOutputTokens: toInt("MAX_OUTPUT_TOKENS"),
+      dimensions: toInt("DIMENSIONS"),
+      normalized: toBool("NORMALIZED"),
+    };
+  }
+
   model(slot: string): ModelConfig {
     const match = /^(llm|embedding|rerank)\.(\d+)$/.exec(slot);
     if (!match) throw new MetisError("INVALID_CONFIG", `invalid model slot ${slot}`);
-    const prefix = `METIS_${match[1].toUpperCase()}_${match[2]}_`;
-    const values: Record<string, string> = {};
-    for (const [name, value] of Object.entries(this.env)) if (name.startsWith(prefix) && value !== undefined) values[name.slice(prefix.length)] = value;
-    if (!values.ENDPOINT || !values.MODEL || !values.API_KEY) throw new MetisError("MISSING_CONFIG", `model slot ${slot} is incomplete`);
-    return { endpoint: values.ENDPOINT, model: values.MODEL, apiKey: values.API_KEY, values };
+    const config = this.parseModelSlot(slot);
+    if (!config) throw new MetisError("MISSING_CONFIG", `model slot ${slot} is incomplete`);
+    return config;
+  }
+
+  tryModel(slot: string): ModelConfig | null {
+    return this.parseModelSlot(slot);
+  }
+
+  models(modelType: string): ModelConfig[] {
+    if (modelType !== "llm" && modelType !== "embedding" && modelType !== "rerank") {
+      throw new MetisError("INVALID_CONFIG", `invalid model type ${modelType}`);
+    }
+    const result: ModelConfig[] = [];
+    for (let i = 0; i < 10; i++) {
+      const config = this.parseModelSlot(`${modelType}.${i}`);
+      if (config) {
+        result.push(config);
+      }
+    }
+    return result;
   }
   objectStorage(): ObjectStorageConfig {
     const value = (name: string) => this.env[name] || "";

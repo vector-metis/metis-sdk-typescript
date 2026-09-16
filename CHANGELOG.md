@@ -1,9 +1,10 @@
 # Changelog
 
-## Unreleased
+## 0.2.1
 
-- 补充 `embedding.N` 和 `rerank.N` 模型 slot 的测试与使用示例。
-- 暴露依赖版本、制品 SHA、直接依赖标记、可用性和解析诊断字段。
+- 服务端 SDK 强类型重构 `ModelConfig`，彻底移除弱类型 `values` 字典。
+- 增加模型特性与卡片参数属性：`supportsVision`, `supportsThinking`, `supportsTools`, `contextWindow`, `maxInputTokens`, `maxOutputTokens`, `dimensions`, `normalized`。
+- 增加批量模型枚举 `models(modelType)` 与安全探活 `tryModel(slot)` API。
 
 ## 0.2.0
 
