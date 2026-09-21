@@ -4,11 +4,16 @@ import { init } from "../dist/index.js";
 
 const platformSDK = {
   appURL: (path) => `/apps/current${path || ""}`,
-  getContext: async () => ({ appId: "current", appType: "RUNTIME_APPLICATION_TYPE_WEB", tenantId: "1", userId: "2", role: "member", actorType: "RUNTIME_ACTOR_TYPE_USER" }),
+  getContext: async () => ({ appId: "current", appType: "RUNTIME_APPLICATION_TYPE_WEB", version: "1.0.0", tenantId: "1", userId: "2", role: "member", actorType: "RUNTIME_ACTOR_TYPE_USER" }),
   listDependencies: async () => [],
   dependency: async (selector) => ({ appId: selector, alias: selector, required: true, appType: "RUNTIME_APPLICATION_TYPE_WEB", available: true, webBasePath: `/apps/${selector}` }),
   dependencyURL: async (selector, path) => `/apps/${selector}${path || ""}`,
   openAppPage: async () => {},
+  ui: {
+    sidebar: { hide: async () => {}, show: async () => {} },
+    toast: { show: async () => {} },
+  },
+  on: () => () => {},
 };
 
 test("loads the platform script and returns the ready SDK", async () => {
@@ -34,6 +39,8 @@ test("loads the platform script and returns the ready SDK", async () => {
   assert.equal(scripts[0].src, "/api/runtime/v1/browser-sdk.js");
   assert.equal(scripts[0].nonce, "test-nonce");
   assert.equal(sdk.appURL("/home"), "/apps/current/home");
+  await sdk.ui.sidebar.hide();
+  assert.equal(typeof sdk.on("route.changed", () => {}), "function");
 });
 
 test("reuses an already loaded platform SDK", async () => {

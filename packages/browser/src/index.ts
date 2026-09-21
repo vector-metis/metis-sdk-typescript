@@ -2,10 +2,15 @@
 export interface BrowserContext {
   appId: string;
   appType: "RUNTIME_APPLICATION_TYPE_WEB";
+  version: string;
   tenantId: string;
   userId: string;
   role: string;
   actorType: "RUNTIME_ACTOR_TYPE_USER";
+  locale?: string;
+  theme?: string;
+  viewport?: { width: number; height: number };
+  route?: string;
 }
 
 /** source 应用声明的 Web 依赖。 */
@@ -23,6 +28,17 @@ export interface WebDependency {
   webBasePath: string;
 }
 
+export type ToastOptions = {
+  level?: "success" | "info" | "warning" | "error";
+  message: string;
+};
+
+export type BrowserEventName =
+  | "context.changed"
+  | "route.changed"
+  | "sidebar.visibility.changed"
+  | "platform.auth.required";
+
 /** 平台注入脚本暴露的能力接口。 */
 export interface InjectedBrowserSDK {
   appURL(path?: string): string;
@@ -31,6 +47,11 @@ export interface InjectedBrowserSDK {
   dependency(aliasOrAppId: string): Promise<WebDependency>;
   dependencyURL(aliasOrAppId: string, path?: string): Promise<string>;
   openAppPage(options: { app: string; path?: string; query?: Record<string, string> }): Promise<void>;
+  ui: {
+    sidebar: { hide(): Promise<void>; show(): Promise<void> };
+    toast: { show(options: ToastOptions): Promise<void> };
+  };
+  on(name: BrowserEventName, callback: (value: unknown) => void): () => void;
 }
 
 declare global {
@@ -65,6 +86,9 @@ function validateSDK(value: unknown): InjectedBrowserSDK {
   ];
   if (methods.some((method) => typeof sdk[method] !== "function")) {
     throw new Error("Metis browser SDK loaded without the required platform methods");
+  }
+  if (!sdk.ui || typeof sdk.ui !== "object" || typeof sdk.ui.sidebar?.hide !== "function" || typeof sdk.ui.sidebar?.show !== "function" || typeof sdk.ui.toast?.show !== "function" || typeof sdk.on !== "function") {
+    throw new Error("Metis browser SDK loaded without interaction capabilities");
   }
   return sdk as InjectedBrowserSDK;
 }
