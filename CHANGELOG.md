@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.3.1
+
+- `init()` 等待平台运行时握手完成；宿主未授予能力时，浏览器 SDK 返回稳定的 `CAPABILITY_UNAVAILABLE` 错误。
+- 平台能力协议继续使用 `v1`，并同步上下文变化事件与工作台能力投影。
+
 ## 0.3.0
 
 - 浏览器 SDK 增加 `ui.sidebar.hide()` / `show()`、统一 Toast 和生命周期事件订阅。

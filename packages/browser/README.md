@@ -23,6 +23,8 @@ const stop = Metis.on("route.changed", () => {
 
 `init()` 会自动加载当前平台的 `/api/runtime/v1/browser-sdk.js`，并在脚本完成且能力校验通过后返回 SDK。重复调用会复用已经加载的 `window.Metis`。本地开发或严格 CSP 场景可以覆盖脚本地址、nonce 和超时时间：
 
+平台握手未在超时时间内完成，或宿主没有授予某项能力时，初始化或调用会失败；应用应按错误的 `reason`（例如 `DEADLINE_EXCEEDED`、`CAPABILITY_UNAVAILABLE`）显示降级状态，不要自行操作父窗口。
+
 ```ts
 const Metis = await init({
   scriptUrl: "/api/runtime/v1/browser-sdk.js",

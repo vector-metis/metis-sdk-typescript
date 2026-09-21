@@ -57,6 +57,7 @@ export interface InjectedBrowserSDK {
 declare global {
   interface Window {
     Metis?: InjectedBrowserSDK;
+    MetisReady?: Promise<InjectedBrowserSDK>;
   }
 }
 
@@ -93,6 +94,12 @@ function validateSDK(value: unknown): InjectedBrowserSDK {
   return sdk as InjectedBrowserSDK;
 }
 
+async function waitForHost(browserWindow: Window): Promise<InjectedBrowserSDK> {
+  const ready = browserWindow.MetisReady;
+  if (ready && typeof ready.then === "function") return validateSDK(await ready);
+  return validateSDK(browserWindow.Metis);
+}
+
 /** Load the platform-injected browser capabilities and return a ready SDK. */
 export function init(options: BrowserSDKInitOptions = {}): Promise<InjectedBrowserSDK> {
   if (initialization) {
@@ -106,7 +113,7 @@ export function init(options: BrowserSDKInitOptions = {}): Promise<InjectedBrows
   }
 
   if (browserWindow.Metis) {
-    return Promise.resolve(validateSDK(browserWindow.Metis));
+    return waitForHost(browserWindow);
   }
   if (!document) {
     return Promise.reject(new Error("Metis browser SDK requires a browser document"));
@@ -132,14 +139,11 @@ export function init(options: BrowserSDKInitOptions = {}): Promise<InjectedBrows
   script.async = true;
   if (options.nonce) script.nonce = options.nonce;
   script.onload = () => {
-    try {
+    void waitForHost(browserWindow).then((sdk) => {
       if (timer) clearTimeout(timer);
-      const sdk = validateSDK(browserWindow.Metis);
       initialization = undefined;
       resolveInitialization(sdk);
-    } catch (error) {
-      fail(error instanceof Error ? error : new Error(String(error)));
-    }
+    }).catch((error: unknown) => fail(error instanceof Error ? error : new Error(String(error))));
   };
   script.onerror = () => fail(new Error(`Failed to load Metis browser SDK: ${script.src}`));
   timer = setTimeout(() => fail(new Error(`Metis browser SDK load timed out after ${timeoutMs}ms`)), timeoutMs);
