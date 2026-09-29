@@ -1,5 +1,10 @@
 # Changelog
 
+## Server 0.4.0 / Browser 0.3.2
+
+- 服务端 SDK 增加平台用户、外部用户和其他用户三类模型用量归因，以及始终携带 slot API key 的 `newModelRequest()`。
+- 浏览器 SDK 仅更新安全边界文档，继续不暴露模型密钥或用户归因能力。
+
 ## 0.3.1
 
 - `init()` 等待平台运行时握手完成；宿主未授予能力时，浏览器 SDK 返回稳定的 `CAPABILITY_UNAVAILABLE` 错误。

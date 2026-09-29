@@ -25,6 +25,10 @@ export type ModelConfig = {
   dimensions: number;
   normalized: boolean;
 };
+export type ModelAttribution =
+  | { kind: "platform"; tenantId: number; userId: number }
+  | { kind: "external"; externalUserId: string }
+  | { kind: "other" };
 export type ObjectStorageConfig = {
   endpoint: string; region: string; accessKey: string; secretKey: string; bucket: string; sharedBuckets: string[];
 };
@@ -206,3 +210,68 @@ export function contextFromHeaders(headers: Headers | Record<string, string | un
 }
 
 export function contextFromRequest(request: Request): RequestContext { return contextFromHeaders(request.headers); }
+
+export function withPlatformIdentity(
+  tenantId: number,
+  userId: number,
+): Extract<ModelAttribution, { kind: "platform" }> {
+  if (!Number.isSafeInteger(tenantId) || tenantId <= 0 || !Number.isSafeInteger(userId) || userId <= 0) {
+    throw new MetisError("INVALID_CONFIG", "platform tenant and user ids must be positive integers");
+  }
+  return { kind: "platform", tenantId, userId };
+}
+
+export function platformIdentityFromHeaders(headers: Headers | Record<string, string | undefined>): ModelAttribution {
+  const context = contextFromHeaders(headers);
+  if (!/^[1-9]\d*$/.test(context.tenantId.trim()) || !/^[1-9]\d*$/.test(context.userId.trim())) {
+    throw new MetisError("INVALID_CONFIG", "headers do not contain a valid platform identity");
+  }
+  return withPlatformIdentity(Number(context.tenantId), Number(context.userId));
+}
+
+export function platformIdentityFromRequest(request: Request): ModelAttribution {
+  return platformIdentityFromHeaders(request.headers);
+}
+
+export function withExternalUser(externalUserId: string): Extract<ModelAttribution, { kind: "external" }> {
+  externalUserId = externalUserId.trim();
+  const bytes = new TextEncoder().encode(externalUserId).byteLength;
+  if (bytes === 0 || bytes > 128 || /\p{Cc}/u.test(externalUserId)) {
+    throw new MetisError("INVALID_CONFIG", "external user id must be 1-128 bytes without control characters");
+  }
+  return { kind: "external", externalUserId };
+}
+
+export function withoutUserAttribution(): Extract<ModelAttribution, { kind: "other" }> { return { kind: "other" }; }
+
+export function newModelRequest(
+  config: ModelConfig,
+  method: string,
+  requestPath: string,
+  attribution: ModelAttribution,
+  body?: BodyInit,
+): Request {
+  const endpoint = config.endpoint.trim().replace(/\/$/, "");
+  requestPath = requestPath.trim();
+  if (!endpoint || !config.apiKey || !requestPath.startsWith("/") || requestPath.startsWith("//")) {
+    throw new MetisError("INVALID_CONFIG", "model endpoint, API key and absolute request path are required");
+  }
+  const headers = new Headers({ Authorization: `Bearer ${config.apiKey}` });
+  switch (attribution.kind) {
+    case "platform": {
+      const identity = withPlatformIdentity(attribution.tenantId, attribution.userId);
+      headers.set("X-Platform-Tenant-Id", String(identity.tenantId));
+      headers.set("X-Platform-User-Id", String(identity.userId));
+      break;
+    }
+    case "external":
+      headers.set("X-Platform-External-User-Id", withExternalUser(attribution.externalUserId).externalUserId);
+      break;
+    case "other":
+      break;
+    default:
+      throw new MetisError("INVALID_CONFIG", "model attribution is required");
+  }
+  try { return new Request(endpoint + requestPath, { method, body, headers }); }
+  catch (error) { throw new MetisError("INVALID_CONFIG", `model request is invalid: ${String(error)}`); }
+}

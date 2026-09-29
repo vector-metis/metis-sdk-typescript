@@ -35,7 +35,7 @@ const Metis = await init({
 
 请在浏览器应用启动阶段调用 `init()`；服务端渲染、Node.js 和构建阶段不提供浏览器环境。
 
-浏览器 SDK 不暴露应用令牌、模型 API key、对象存储凭据或 Service 端口。完整说明见[开发文档](https://github.com/vector-metis/metis-sdk-typescript#readme)。
+浏览器 SDK 不暴露应用令牌、模型 API key、模型用户归因、对象存储凭据或 Service 端口。完整说明见[开发文档](https://github.com/vector-metis/metis-sdk-typescript#readme)。
 
 互动能力包括：
 

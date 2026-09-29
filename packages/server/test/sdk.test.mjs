@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
-import { Client, contextFromHeaders } from "../dist/index.js";
+import {
+  Client, MetisError, contextFromHeaders, newModelRequest, platformIdentityFromHeaders,
+  platformIdentityFromRequest, withExternalUser, withPlatformIdentity, withoutUserAttribution,
+} from "../dist/index.js";
 
 const fixture = JSON.parse(await readFile(new URL("./fixtures/runtime.json", import.meta.url)));
 
@@ -72,4 +75,44 @@ test("web dependency paths stay within the application root", async () => {
   for (const path of ["../admin", "%2e%2e/admin", "..\\admin"]) {
     await assert.rejects(client.webURL("ui", path), (error) => error.reason === "INVALID_CONFIG");
   }
+});
+
+test("model requests always carry the slot key and one attribution", () => {
+  const model = {
+    endpoint: "http://metis.internal/model-gateway/", model: "chat", apiKey: "slot-key",
+    supportsVision: false, supportsThinking: false, supportsTools: false, contextWindow: 0,
+    maxInputTokens: 0, maxOutputTokens: 0, dimensions: 0, normalized: false,
+  };
+  const platform = newModelRequest(model, "POST", "/v1/chat/completions", withPlatformIdentity(42, 84));
+  assert.equal(platform.headers.get("authorization"), "Bearer slot-key");
+  assert.equal(platform.headers.get("x-platform-tenant-id"), "42");
+  assert.equal(platform.headers.get("x-platform-user-id"), "84");
+  assert.equal(platform.headers.get("x-platform-external-user-id"), null);
+
+  const external = newModelRequest(model, "POST", "/v1/embeddings", withExternalUser(" customer-1 "));
+  assert.equal(external.headers.get("authorization"), "Bearer slot-key");
+  assert.equal(external.headers.get("x-platform-tenant-id"), null);
+  assert.equal(external.headers.get("x-platform-user-id"), null);
+  assert.equal(external.headers.get("x-platform-external-user-id"), "customer-1");
+
+  const other = newModelRequest(model, "POST", "/v1/rerank", withoutUserAttribution());
+  assert.equal(other.headers.get("authorization"), "Bearer slot-key");
+  assert.equal(other.headers.get("x-platform-external-user-id"), null);
+});
+
+test("model attribution validates identities and request paths", () => {
+  assert.deepEqual(platformIdentityFromHeaders({ "x-platform-tenant-id": "42", "X-Platform-User-Id": "84" }), withPlatformIdentity(42, 84));
+  assert.deepEqual(platformIdentityFromRequest(new Request("http://example.test", { headers: { "X-Platform-Tenant-Id": "42", "X-Platform-User-Id": "84" } })), withPlatformIdentity(42, 84));
+  for (const ids of [[0, 1], [1, -1], [1.5, 2], [Number.MAX_SAFE_INTEGER + 1, 2]]) {
+    assert.throws(() => withPlatformIdentity(ids[0], ids[1]), (error) => error instanceof MetisError && error.reason === "INVALID_CONFIG");
+  }
+  for (const id of ["", " ", "a".repeat(129), "你".repeat(43), "bad\nvalue"]) {
+    assert.throws(() => withExternalUser(id), (error) => error instanceof MetisError && error.reason === "INVALID_CONFIG");
+  }
+  assert.throws(() => platformIdentityFromHeaders({}), (error) => error instanceof MetisError && error.reason === "INVALID_CONFIG");
+  const model = { endpoint: "http://metis.internal/model-gateway", apiKey: "slot-key" };
+  for (const path of ["", "v1/chat/completions", "//elsewhere.test/v1"]) {
+    assert.throws(() => newModelRequest(model, "POST", path, withoutUserAttribution()), (error) => error instanceof MetisError && error.reason === "INVALID_CONFIG");
+  }
+  assert.throws(() => newModelRequest(model, "POST", "/v1/chat/completions", {}), (error) => error instanceof MetisError && error.reason === "INVALID_CONFIG");
 });

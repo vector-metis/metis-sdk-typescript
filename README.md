@@ -21,6 +21,8 @@ const Metis = await init();
 后端 `Dependency` 返回 `requestedVersion`、`resolvedVersion`、`packageSha256`、`direct`、
 `available` 和 `resolutionError`，应用应在使用可选依赖前检查 `available`。
 
+服务端 SDK 可用 `newModelRequest()` 携带模型 slot API key，并通过 `platformIdentityFromRequest()`、`withExternalUser()` 或 `withoutUserAttribution()` 显式记录最终用户归因。浏览器 SDK 不暴露模型密钥或外部用户归因能力。
+
 ```bash
 pnpm install --frozen-lockfile
 pnpm -r test
