@@ -13,7 +13,8 @@ test("shared contract, cache, refresh and capability config", async () => {
   const fetch = async (input) => {
     calls++;
     const path = new URL(input).pathname;
-    return new Response(JSON.stringify(path.endsWith("/endpoints/database") ? fixture.endpoint : fixture.dependencies), { status: 200, headers: { "content-type": "application/json" } });
+    const payload = path.endsWith("/endpoints/database") ? fixture.endpoint : path.endsWith("/models") ? { models: [{ slot: "llm.0", slotType: "llm", slotIndex: 0, interface: "openai.chat.completions", model: "qwen-plus", displayName: "通义千问 Plus", traits: ["vision", "tools"], supportsVision: true, supportsTools: true, activity: "active", busyLevel: "unknown" }] } : fixture.dependencies;
+    return new Response(JSON.stringify(payload), { status: 200, headers: { "content-type": "application/json" } });
   };
   const client = new Client({ platformEndpoint: "http://metis.internal", appId: "caller-a7x2m", appToken: "app-token", environment: fixture.environment, fetch });
   assert.equal((await client.listDependencies())[0].alias, "ui");
@@ -22,6 +23,10 @@ test("shared contract, cache, refresh and capability config", async () => {
   await client.listDependencies(true);
   assert.equal(calls, 2);
   assert.equal((await client.serviceEndpoint("data", "database")).port, 31001);
+  const runtimeModels = await client.listRuntimeModels();
+  assert.equal(runtimeModels[0].slot, "llm.0");
+  assert.equal(runtimeModels[0].supportsVision, true);
+  assert.equal(runtimeModels[0].busyLevel, "unknown");
   const llm = client.model("llm.0");
   assert.equal(llm.model, "example-chat");
   assert.equal(llm.supportsVision, true);

@@ -23,6 +23,8 @@ const Metis = await init();
 
 服务端 SDK 可用 `newModelRequest()` 携带模型 slot API key，并通过 `platformIdentityFromRequest()`、`withExternalUser()` 或 `withoutUserAttribution()` 显式记录最终用户归因。浏览器 SDK 不暴露模型密钥或外部用户归因能力。
 
+服务端 SDK 的 `listRuntimeModels()` 返回当前应用已绑定 slot 的展示名称、图标、能力、上下文限制和繁忙度，不返回 API key 或供应商凭据。
+
 ```bash
 pnpm install --frozen-lockfile
 pnpm -r test

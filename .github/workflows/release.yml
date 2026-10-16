@@ -29,7 +29,17 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm -r test
       - run: pnpm -r build
-      # GitHub checks out a tag in detached HEAD state. pnpm's default branch
-      # check is not meaningful for an immutable release tag.
-      - run: pnpm --filter @vector-metis/server-sdk publish --access public --provenance --no-git-checks
-      - run: pnpm --filter @vector-metis/browser-sdk publish --access public --provenance --no-git-checks
+      # GitHub checks out a tag in detached HEAD state. Publish only packages
+      # changed by this tag so an unchanged package is never republished.
+      - name: Publish changed packages
+        env:
+          VERSION: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          changed="$(git diff-tree --no-commit-id --name-only -r "$GITHUB_SHA^" "$GITHUB_SHA")"
+          if printf '%s\n' "$changed" | grep -Eq '^(packages/server/|package.json|pnpm-lock.yaml|pnpm-workspace.yaml)'; then
+            pnpm --filter @vector-metis/server-sdk publish --access public --provenance --no-git-checks
+          fi
+          if printf '%s\n' "$changed" | grep -Eq '^(packages/browser/|package.json|pnpm-lock.yaml|pnpm-workspace.yaml)'; then
+            pnpm --filter @vector-metis/browser-sdk publish --access public --provenance --no-git-checks
+          fi

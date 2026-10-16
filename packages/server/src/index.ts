@@ -25,6 +25,13 @@ export type ModelConfig = {
   dimensions: number;
   normalized: boolean;
 };
+export type RuntimeModel = {
+  slot: string; slotType: string; slotIndex: number; interface: string;
+  endpoint: string; model: string; displayName: string; iconUrl: string; description: string;
+  traits: string[]; supportsVision: boolean; supportsThinking: boolean; supportsTools: boolean;
+  contextWindow: number; maxInputTokens: number; maxOutputTokens: number; dimensions: number;
+  activity: string; busyLevel: string; updatedAt: string;
+};
 export type ModelAttribution =
   | { kind: "platform"; tenantId: number; userId: number }
   | { kind: "external"; externalUserId: string }
@@ -85,6 +92,10 @@ export class Client {
   }
   serviceEndpoint(selector: string, endpointName: string, refresh = false): Promise<ServiceEndpoint> {
     return this.get(this.path("dependencies", selector, "endpoints", endpointName), refresh);
+  }
+  async listRuntimeModels(refresh = false): Promise<RuntimeModel[]> {
+    const result = await this.get<{ models?: RuntimeModel[] }>(this.path("models"), refresh);
+    return result.models ?? [];
   }
   private parseModelSlot(slot: string): ModelConfig | null {
     const match = /^(llm|embedding|rerank)\.(\d+)$/.exec(slot);

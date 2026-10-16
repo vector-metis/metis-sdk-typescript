@@ -1,9 +1,10 @@
 # Changelog
 
-## Server 0.4.0 / Browser 0.3.2
+## Server 0.4.1 / Browser 0.3.2
 
 - 服务端 SDK 增加平台用户、外部用户和其他用户三类模型用量归因，以及始终携带 slot API key 的 `newModelRequest()`。
 - 浏览器 SDK 仅更新安全边界文档，继续不暴露模型密钥或用户归因能力。
+- 服务端 SDK 增加 `listRuntimeModels()`，读取当前应用模型 slot 的展示元数据和非敏感能力字段。
 
 ## 0.3.1
 
