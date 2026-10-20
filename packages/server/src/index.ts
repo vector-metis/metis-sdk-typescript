@@ -31,6 +31,15 @@ export type RuntimeModel = {
   traits: string[]; supportsVision: boolean; supportsThinking: boolean; supportsTools: boolean;
   contextWindow: number; maxInputTokens: number; maxOutputTokens: number; dimensions: number;
   activity: string; busyLevel: string; updatedAt: string;
+  declared: boolean; bound: boolean; status: string; iconFileId: number;
+  supportsAudio: boolean; supportsImageInput: boolean; supportsMultimodal: boolean;
+};
+export type RuntimeSetting = { type: string; required: boolean; value: string };
+export type RuntimeConfig = {
+  schemaVersion: number; revision: number; updatedAt: string;
+  application: Record<string, unknown>;
+  settings: Record<string, RuntimeSetting>; models: Record<string, RuntimeModel>;
+  storage: Record<string, unknown>; tenant: Record<string, unknown>; features: Record<string, unknown>;
 };
 export type ModelAttribution =
   | { kind: "platform"; tenantId: number; userId: number }
@@ -42,7 +51,7 @@ export type ObjectStorageConfig = {
 export type ApplicationConfig = { id: string; name: string; version: string; platformEndpoint: string };
 export type Config = {
   platformEndpoint?: string; appId?: string; appToken?: string; environment?: Record<string, string | undefined>;
-  fetch?: typeof globalThis.fetch; cacheTTL?: number;
+  fetch?: typeof globalThis.fetch; cacheTTL?: number; serviceName?: string;
 };
 
 export class MetisError extends Error {
@@ -55,6 +64,7 @@ export class Client {
   private readonly endpoint: URL;
   private readonly appId: string;
   private readonly token: string;
+  private readonly service: string;
   private readonly fetcher: typeof globalThis.fetch;
   private readonly ttl: number;
   private readonly env: Record<string, string | undefined>;
@@ -65,6 +75,7 @@ export class Client {
     const endpoint = config.platformEndpoint || env.METIS_PLATFORM_ENDPOINT || "";
     this.appId = config.appId || env.METIS_APP_ID || "";
     this.token = config.appToken || env.METIS_APP_TOKEN || "";
+    this.service = config.serviceName || env.METIS_SERVICE_NAME || "";
     if (!endpoint || !this.appId || !this.token) throw new MetisError("MISSING_CONFIG", "METIS_PLATFORM_ENDPOINT, METIS_APP_ID and METIS_APP_TOKEN are required");
     try { this.endpoint = new URL(endpoint); } catch { throw new MetisError("INVALID_CONFIG", "METIS_PLATFORM_ENDPOINT must be an absolute HTTP URL"); }
     if (!/^https?:$/.test(this.endpoint.protocol)) throw new MetisError("INVALID_CONFIG", "METIS_PLATFORM_ENDPOINT must be an absolute HTTP URL");
@@ -93,9 +104,11 @@ export class Client {
   serviceEndpoint(selector: string, endpointName: string, refresh = false): Promise<ServiceEndpoint> {
     return this.get(this.path("dependencies", selector, "endpoints", endpointName), refresh);
   }
-  async listRuntimeModels(refresh = false): Promise<RuntimeModel[]> {
-    const result = await this.get<{ models?: RuntimeModel[] }>(this.path("models"), refresh);
-    return result.models ?? [];
+  async runtimeConfig(refresh = false): Promise<RuntimeConfig> {
+    if (!this.service.trim()) throw new MetisError("MISSING_CONFIG", "METIS_SERVICE_NAME is required");
+    const result = await this.get<{ schemaVersion?: number; revision?: number; updatedAt?: string; application?: Record<string, unknown>; config?: Partial<RuntimeConfig> }>("/api/runtime/v1/config", refresh, { "X-Metis-Service": this.service });
+    const config = result.config || {};
+    return { schemaVersion: result.schemaVersion || 0, revision: result.revision || 0, updatedAt: result.updatedAt || "", application: result.application || {}, settings: config.settings || {}, models: config.models || {}, storage: config.storage || {}, tenant: config.tenant || {}, features: config.features || {} };
   }
   private parseModelSlot(slot: string): ModelConfig | null {
     const match = /^(llm|embedding|rerank)\.(\d+)$/.exec(slot);
@@ -198,10 +211,10 @@ export class Client {
     }
     return new URL(`${base.replace(/\/$/, "")}/${path.replace(/^\//, "")}`, this.endpoint).toString();
   }
-  private async get<T>(path: string, refresh: boolean): Promise<T> {
+  private async get<T>(path: string, refresh: boolean, extraHeaders: Record<string, string> = {}): Promise<T> {
     const cached = this.cache.get(path);
     if (!refresh && cached && cached.expires > Date.now()) return cached.value as T;
-    const response = await this.fetcher(new URL(path, this.endpoint), { headers: { Authorization: `Bearer ${this.token}` } });
+    const response = await this.fetcher(new URL(path, this.endpoint), { headers: { Authorization: `Bearer ${this.token}`, ...extraHeaders } });
     let body: Record<string, unknown> = {};
     try { body = await response.json() as Record<string, unknown>; }
     catch {

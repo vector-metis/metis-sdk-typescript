@@ -13,20 +13,21 @@ test("shared contract, cache, refresh and capability config", async () => {
   const fetch = async (input) => {
     calls++;
     const path = new URL(input).pathname;
-    const payload = path.endsWith("/endpoints/database") ? fixture.endpoint : path.endsWith("/models") ? { models: [{ slot: "llm.0", slotType: "llm", slotIndex: 0, interface: "openai.chat.completions", model: "qwen-plus", displayName: "通义千问 Plus", traits: ["vision", "tools"], supportsVision: true, supportsTools: true, activity: "active", busyLevel: "unknown" }] } : fixture.dependencies;
+    const payload = path.endsWith("/endpoints/database") ? fixture.endpoint : path.endsWith("/config") ? { schemaVersion: 1, revision: 2, config: { settings: { "site-name": { type: "string", value: "demo" } }, models: { "llm.0": { slot: "llm.0", model: "qwen-plus", displayName: "通义千问 Plus", supportsVision: true, activity: "active", busyLevel: "unknown" } }, storage: {}, tenant: {}, features: {} } } : fixture.dependencies;
+    if (path.endsWith("/config")) assert.equal(new URL(input).pathname, "/api/runtime/v1/config");
     return new Response(JSON.stringify(payload), { status: 200, headers: { "content-type": "application/json" } });
   };
-  const client = new Client({ platformEndpoint: "http://metis.internal", appId: "caller-a7x2m", appToken: "app-token", environment: fixture.environment, fetch });
+  const client = new Client({ platformEndpoint: "http://metis.internal", appId: "caller-a7x2m", appToken: "app-token", environment: { ...fixture.environment, METIS_SERVICE_NAME: "web" }, fetch });
   assert.equal((await client.listDependencies())[0].alias, "ui");
   await client.listDependencies();
   assert.equal(calls, 1);
   await client.listDependencies(true);
   assert.equal(calls, 2);
   assert.equal((await client.serviceEndpoint("data", "database")).port, 31001);
-  const runtimeModels = await client.listRuntimeModels();
-  assert.equal(runtimeModels[0].slot, "llm.0");
-  assert.equal(runtimeModels[0].supportsVision, true);
-  assert.equal(runtimeModels[0].busyLevel, "unknown");
+  const runtimeConfig = await client.runtimeConfig();
+  assert.equal(runtimeConfig.revision, 2);
+  assert.equal(runtimeConfig.models["llm.0"].displayName, "通义千问 Plus");
+  assert.equal(runtimeConfig.models["llm.0"].supportsVision, true);
   const llm = client.model("llm.0");
   assert.equal(llm.model, "example-chat");
   assert.equal(llm.supportsVision, true);

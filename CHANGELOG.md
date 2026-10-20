@@ -1,5 +1,11 @@
 # Changelog
 
+## Server 0.5.0
+
+- 用 `runtimeConfig()` 统一读取当前 service 的 settings、models、storage、tenant、features 和 revision。
+- 删除已废弃的 `listRuntimeModels()` 及旧 Runtime Model API 路由。
+- 增加 `METIS_SERVICE_NAME`、完整模型展示字段和能力状态。
+
 ## Server 0.4.2 / Browser 0.3.2
 
 - 服务端 SDK 增加平台用户、外部用户和其他用户三类模型用量归因，以及始终携带 slot API key 的 `newModelRequest()`。
