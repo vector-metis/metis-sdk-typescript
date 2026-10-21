@@ -108,7 +108,8 @@ export class Client {
     if (!this.service.trim()) throw new MetisError("MISSING_CONFIG", "METIS_SERVICE_NAME is required");
     const result = await this.get<{ schemaVersion?: number; revision?: number; updatedAt?: string; application?: Record<string, unknown>; config?: Partial<RuntimeConfig> }>("/api/runtime/v1/config", refresh, { "X-Metis-Service": this.service });
     const config = result.config || {};
-    return { schemaVersion: result.schemaVersion || 0, revision: result.revision || 0, updatedAt: result.updatedAt || "", application: result.application || {}, settings: config.settings || {}, models: config.models || {}, storage: config.storage || {}, tenant: config.tenant || {}, features: config.features || {} };
+    const models = Object.fromEntries(Object.entries(config.models || {}).map(([key, value]) => [key, { ...(value as RuntimeModel), slotIndex: Number((value as RuntimeModel).slotIndex || 0), contextWindow: Number((value as RuntimeModel).contextWindow || 0), maxInputTokens: Number((value as RuntimeModel).maxInputTokens || 0), maxOutputTokens: Number((value as RuntimeModel).maxOutputTokens || 0), dimensions: Number((value as RuntimeModel).dimensions || 0), iconFileId: Number((value as RuntimeModel).iconFileId || 0) }]));
+    return { schemaVersion: Number(result.schemaVersion || 0), revision: Number(result.revision || 0), updatedAt: result.updatedAt || "", application: result.application || {}, settings: config.settings || {}, models, storage: config.storage || {}, tenant: config.tenant || {}, features: config.features || {} };
   }
   private parseModelSlot(slot: string): ModelConfig | null {
     const match = /^(llm|embedding|rerank)\.(\d+)$/.exec(slot);

@@ -13,7 +13,7 @@ test("shared contract, cache, refresh and capability config", async () => {
   const fetch = async (input) => {
     calls++;
     const path = new URL(input).pathname;
-    const payload = path.endsWith("/endpoints/database") ? fixture.endpoint : path.endsWith("/config") ? { schemaVersion: 1, revision: 2, config: { settings: { "site-name": { type: "string", value: "demo" } }, models: { "llm.0": { slot: "llm.0", model: "qwen-plus", displayName: "通义千问 Plus", supportsVision: true, activity: "active", busyLevel: "unknown" } }, storage: {}, tenant: {}, features: {} } } : fixture.dependencies;
+    const payload = path.endsWith("/endpoints/database") ? fixture.endpoint : path.endsWith("/config") ? { schemaVersion: "1", revision: "2", config: { settings: { "site-name": { type: "string", value: "demo" } }, models: { "llm.0": { slot: "llm.0", slotIndex: "0", model: "qwen-plus", displayName: "通义千问 Plus", contextWindow: "131072", iconFileId: "42", supportsVision: true, activity: "active", busyLevel: "unknown" } }, storage: {}, tenant: {}, features: {} } } : fixture.dependencies;
     if (path.endsWith("/config")) assert.equal(new URL(input).pathname, "/api/runtime/v1/config");
     return new Response(JSON.stringify(payload), { status: 200, headers: { "content-type": "application/json" } });
   };
