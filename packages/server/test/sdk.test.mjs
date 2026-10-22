@@ -13,7 +13,7 @@ test("shared contract, cache, refresh and capability config", async () => {
   const fetch = async (input) => {
     calls++;
     const path = new URL(input).pathname;
-    const payload = path.endsWith("/endpoints/database") ? fixture.endpoint : path.endsWith("/config") ? { schemaVersion: "1", revision: "2", config: { settings: { "site-name": { type: "string", value: "demo" } }, models: { "llm.0": { slot: "llm.0", slotIndex: "0", model: "qwen-plus", displayName: "通义千问 Plus", contextWindow: "131072", iconFileId: "42", supportsVision: true, activity: "active", busyLevel: "unknown" } }, storage: {}, tenant: {}, features: {} } } : fixture.dependencies;
+    const payload = path.endsWith("/endpoints/database") ? fixture.endpoint : path.endsWith("/config") ? { schemaVersion: 1, revision: "2", config: { settings: { "site-name": { type: "string", value: "demo" } }, models: { "llm.0": { slot: "llm.0", slotIndex: 0, model: "qwen-plus", displayName: "通义千问 Plus", contextWindow: "131072", iconFileId: "42", supportsVision: true, activity: "active", busyLevel: "unknown" } }, storage: {}, tenant: {}, features: {} } } : fixture.dependencies;
     if (path.endsWith("/config")) assert.equal(new URL(input).pathname, "/api/runtime/v1/config");
     return new Response(JSON.stringify(payload), { status: 200, headers: { "content-type": "application/json" } });
   };
@@ -25,9 +25,11 @@ test("shared contract, cache, refresh and capability config", async () => {
   assert.equal(calls, 2);
   assert.equal((await client.serviceEndpoint("data", "database")).port, 31001);
   const runtimeConfig = await client.runtimeConfig();
-  assert.equal(runtimeConfig.revision, 2);
+  assert.equal(runtimeConfig.revision, "2");
   assert.equal(runtimeConfig.models["llm.0"].displayName, "通义千问 Plus");
   assert.equal(runtimeConfig.models["llm.0"].supportsVision, true);
+  assert.equal(runtimeConfig.models["llm.0"].contextWindow, "131072");
+  assert.equal(runtimeConfig.models["llm.0"].iconFileId, "42");
   const llm = client.model("llm.0");
   assert.equal(llm.model, "example-chat");
   assert.equal(llm.supportsVision, true);
@@ -53,6 +55,15 @@ test("shared contract, cache, refresh and capability config", async () => {
   assert.equal(client.model("rerank.0").model, "example-rerank");
   assert.deepEqual(client.objectStorage().sharedBuckets, ["shared-assets"]);
   assert.equal(contextFromHeaders(fixture.trustedHeaders).tenantId, "42");
+});
+
+test("runtime 64-bit values remain strings", async () => {
+  const fetch = async () => new Response(JSON.stringify({ schemaVersion: 1, revision: "9007199254740993", config: { models: { "llm.0": { contextWindow: "9007199254740993", iconFileId: "640409671307362374" } } } }), { status: 200, headers: { "content-type": "application/json" } });
+  const client = new Client({ platformEndpoint: "http://metis.internal", appId: "caller-a7x2m", appToken: "token", serviceName: "web", fetch });
+  const config = await client.runtimeConfig();
+  assert.equal(config.revision, "9007199254740993");
+  assert.equal(config.models["llm.0"].contextWindow, "9007199254740993");
+  assert.equal(config.models["llm.0"].iconFileId, "640409671307362374");
 });
 
 test("failures are not cached", async () => {

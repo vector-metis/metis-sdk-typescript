@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.5.2
+
+- Runtime Config 的 protobuf `int64/uint64` 字段统一以 `string` 暴露，删除 `Number()` 转换并增加大整数测试。
+
 ## Server 0.5.0
 
 - 用 `runtimeConfig()` 统一读取当前 service 的 settings、models、storage、tenant、features 和 revision。

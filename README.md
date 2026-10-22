@@ -25,6 +25,8 @@ const Metis = await init();
 
 服务端 SDK 的 `runtimeConfig()` 返回当前 service 的模型展示名称、图标、能力、上下文限制、状态和 revision，不返回 API key 或供应商凭据。
 
+Runtime Config 中原始 protobuf 类型为 `int64` 或 `uint64` 的字段（如 `revision`、`contextWindow` 和 `iconFileId`）在 protojson 中使用十进制字符串，TypeScript SDK 也声明为 `string`。即使运行在 Node.js 后端也不能用 JavaScript `number` 安全表示全部 64 位整数；SDK 不执行 `Number()` 或递归类型猜测，需要计算时由应用显式调用 `BigInt(value)`。`int32/uint32` 和有限浮点字段仍按数字处理。
+
 ```bash
 pnpm install --frozen-lockfile
 pnpm -r test

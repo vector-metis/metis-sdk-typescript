@@ -29,14 +29,20 @@ export type RuntimeModel = {
   slot: string; slotType: string; slotIndex: number; interface: string;
   endpoint: string; model: string; displayName: string; iconUrl: string; description: string;
   traits: string[]; supportsVision: boolean; supportsThinking: boolean; supportsTools: boolean;
-  contextWindow: number; maxInputTokens: number; maxOutputTokens: number; dimensions: number;
+  /** Original protobuf type: int64; protojson and the SDK use a decimal string. */
+  contextWindow: string; maxInputTokens: string; maxOutputTokens: string; dimensions: string;
   activity: string; busyLevel: string; updatedAt: string;
-  declared: boolean; bound: boolean; status: string; iconFileId: number;
+  declared: boolean; bound: boolean; status: string;
+  /** Original protobuf type: int64; keep IDs as strings in Node.js too. */
+  iconFileId: string;
   supportsAudio: boolean; supportsImageInput: boolean; supportsMultimodal: boolean;
 };
 export type RuntimeSetting = { type: string; required: boolean; value: string };
 export type RuntimeConfig = {
-  schemaVersion: number; revision: number; updatedAt: string;
+  schemaVersion: number;
+  /** Original protobuf type: int64; do not coerce to JavaScript number. */
+  revision: string;
+  updatedAt: string;
   application: Record<string, unknown>;
   settings: Record<string, RuntimeSetting>; models: Record<string, RuntimeModel>;
   storage: Record<string, unknown>; tenant: Record<string, unknown>; features: Record<string, unknown>;
@@ -106,10 +112,10 @@ export class Client {
   }
   async runtimeConfig(refresh = false): Promise<RuntimeConfig> {
     if (!this.service.trim()) throw new MetisError("MISSING_CONFIG", "METIS_SERVICE_NAME is required");
-    const result = await this.get<{ schemaVersion?: number; revision?: number; updatedAt?: string; application?: Record<string, unknown>; config?: Partial<RuntimeConfig> }>("/api/runtime/v1/config", refresh, { "X-Metis-Service": this.service });
+    const result = await this.get<{ schemaVersion?: number; revision?: string; updatedAt?: string; application?: Record<string, unknown>; config?: Partial<RuntimeConfig> }>("/api/runtime/v1/config", refresh, { "X-Metis-Service": this.service });
     const config = result.config || {};
-    const models = Object.fromEntries(Object.entries(config.models || {}).map(([key, value]) => [key, { ...(value as RuntimeModel), slotIndex: Number((value as RuntimeModel).slotIndex || 0), contextWindow: Number((value as RuntimeModel).contextWindow || 0), maxInputTokens: Number((value as RuntimeModel).maxInputTokens || 0), maxOutputTokens: Number((value as RuntimeModel).maxOutputTokens || 0), dimensions: Number((value as RuntimeModel).dimensions || 0), iconFileId: Number((value as RuntimeModel).iconFileId || 0) }]));
-    return { schemaVersion: Number(result.schemaVersion || 0), revision: Number(result.revision || 0), updatedAt: result.updatedAt || "", application: result.application || {}, settings: config.settings || {}, models, storage: config.storage || {}, tenant: config.tenant || {}, features: config.features || {} };
+    const models = config.models || {};
+    return { schemaVersion: result.schemaVersion || 0, revision: result.revision || "", updatedAt: result.updatedAt || "", application: result.application || {}, settings: config.settings || {}, models, storage: config.storage || {}, tenant: config.tenant || {}, features: config.features || {} };
   }
   private parseModelSlot(slot: string): ModelConfig | null {
     const match = /^(llm|embedding|rerank)\.(\d+)$/.exec(slot);
