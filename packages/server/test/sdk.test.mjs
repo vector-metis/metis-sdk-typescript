@@ -66,6 +66,35 @@ test("runtime 64-bit values remain strings", async () => {
   assert.equal(config.models["llm.0"].iconFileId, "640409671307362374");
 });
 
+test("runtime capabilities, Skill files and platform MCP share the app token", async () => {
+  const fetch = async (input, init = {}) => {
+    const url = new URL(input);
+    assert.equal(init.headers.Authorization, "Bearer token");
+    if (url.pathname === "/api/runtime/v1/capabilities") {
+      assert.equal(url.searchParams.get("app_id"), "caller-a7x2m");
+      return new Response(JSON.stringify({ capabilities: [{ id: "640409671307362374", kind: "skill", key: "app-a7x2m/guide", name: "guide", version: "1.2.3", files: [{ path: "SKILL.md", size: "9007199254740993", sha256: "abc", mediaType: "text/markdown" }] }] }), { status: 200 });
+    }
+    if (url.pathname === "/api/runtime/v1/skill-files") {
+      assert.equal(url.searchParams.get("skill_key"), "app-a7x2m/guide");
+      assert.equal(url.searchParams.get("path"), "SKILL.md");
+      return new Response(JSON.stringify({ file: { path: "SKILL.md", size: "9007199254740993", sha256: "abc", mediaType: "text/markdown" }, body: "aGVsbG8=" }), { status: 200 });
+    }
+    assert.equal(url.pathname, "/mcp/v1/platform");
+    assert.equal(init.headers["Mcp-Method"], "tools/call");
+    assert.equal(init.headers["Mcp-Name"], "search");
+    return new Response(JSON.stringify({ jsonrpc: "2.0", id: "metis-sdk-1", result: { content: [{ type: "text", text: "ok" }] } }), { status: 200 });
+  };
+  const client = new Client({ platformEndpoint: "http://metis.internal", appId: "caller-a7x2m", appToken: "token", fetch });
+  const capabilities = await client.listCapabilities();
+  assert.equal(capabilities[0].id, "640409671307362374");
+  assert.equal(capabilities[0].files[0].size, "9007199254740993");
+  const file = await client.readSkillFile("app-a7x2m/guide", "SKILL.md");
+  assert.equal(new TextDecoder().decode(file.body), "hello");
+  assert.equal(file.file.size, "9007199254740993");
+  const result = await client.callPlatformMCPTool("search", { query: "guide" });
+  assert.equal(result.content[0].text, "ok");
+});
+
 test("failures are not cached", async () => {
   let calls = 0;
   const fetch = async () => new Response(JSON.stringify(++calls === 1 ? { reason: "UPSTREAM_FAILURE", message: "temporary" } : { dependencies: [] }), { status: calls === 1 ? 502 : 200, headers: { "content-type": "application/json" } });

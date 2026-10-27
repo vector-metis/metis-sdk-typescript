@@ -28,4 +28,20 @@ const request = newModelRequest(model, "POST", "/v1/chat/completions", attributi
 
 生产环境使用 `fromEnv()` 读取 `METIS_PLATFORM_ENDPOINT`、`METIS_APP_ID` 和 `METIS_APP_TOKEN`。完整方法和应用协作示例见[开发文档](https://github.com/vector-metis/metis-sdk-typescript#readme)。
 
+应用可以读取当前 service 可见的 MCP/Skill，并按需读取 Skill 文件：
+
+```ts
+const capabilities = await client.listCapabilities();
+for (const capability of capabilities) {
+  console.log(capability.kind, capability.key, capability.version);
+}
+const file = await client.readSkillFile("my-app/guide", "SKILL.md");
+console.log(file.file.path, file.file.size, new TextDecoder().decode(file.body));
+const result = await client.callPlatformMCPTool("search", { query: "guide" });
+```
+
+`callPlatformMCPTool()` 返回平台 MCP 工具的 JSON `result`，平台负责统一认证、可见性和审计。
+`RuntimeCapability.id`、`RuntimeSkillFile.size` 等原始 protobuf `int64/uint64` 字段保持十进制
+字符串，SDK 不转换为 JavaScript `number`。
+
 Apache-2.0，见仓库中的 `LICENSE`。

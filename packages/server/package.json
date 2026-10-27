@@ -1,6 +1,6 @@
 {
   "name": "@vector-metis/server-sdk",
-  "version": "0.5.2",
+  "version": "0.6.0",
   "description": "Metis application backend runtime SDK",
   "repository": {
     "type": "git",

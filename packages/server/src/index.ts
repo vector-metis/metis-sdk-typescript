@@ -47,6 +47,17 @@ export type RuntimeConfig = {
   settings: Record<string, RuntimeSetting>; models: Record<string, RuntimeModel>;
   storage: Record<string, unknown>; tenant: Record<string, unknown>; features: Record<string, unknown>;
 };
+/** Skill 文件的非敏感清单和摘要；原始 protobuf int64 的 size 保持字符串。 */
+export type RuntimeSkillFile = { path: string; size: string; sha256: string; mediaType: string };
+/** 当前 service 可见的 MCP/Skill 目录投影。 */
+export type RuntimeCapability = {
+  id: string; kind: string; key: string; name: string; description: string;
+  source: string; version: string; digest: string; endpoint: string; path: string;
+  transport: string; protocolVersion: string; scope: string; restricted: boolean;
+  status: string; files: RuntimeSkillFile[];
+};
+/** 按需读取的 Skill 文件正文。 */
+export type RuntimeSkillFileContent = { file: RuntimeSkillFile; body: Uint8Array };
 export type ModelAttribution =
   | { kind: "platform"; tenantId: number; userId: number }
   | { kind: "external"; externalUserId: string }
@@ -116,6 +127,47 @@ export class Client {
     const config = result.config || {};
     const models = config.models || {};
     return { schemaVersion: result.schemaVersion || 0, revision: result.revision || "", updatedAt: result.updatedAt || "", application: result.application || {}, settings: config.settings || {}, models, storage: config.storage || {}, tenant: config.tenant || {}, features: config.features || {} };
+  }
+  /** 列出当前 service 可见的 MCP 和 Skill。 */
+  async listCapabilities(refresh = false): Promise<RuntimeCapability[]> {
+    const result = await this.get<{ capabilities?: Record<string, unknown>[] }>(`/api/runtime/v1/capabilities?app_id=${encodeURIComponent(this.appId)}`, refresh);
+    return (result.capabilities || []).map((value) => ({
+      id: proto64String(value.id, "id"), kind: String(value.kind || ""), key: String(value.key || ""),
+      name: String(value.name || ""), description: String(value.description || ""), source: String(value.source || ""),
+      version: String(value.version || ""), digest: String(value.digest || ""), endpoint: String(value.endpoint || ""),
+      path: String(value.path || ""), transport: String(value.transport || ""), protocolVersion: String(value.protocolVersion || ""),
+      scope: String(value.scope || ""), restricted: Boolean(value.restricted), status: String(value.status || ""),
+      files: Array.isArray(value.files) ? value.files.map((file) => runtimeSkillFile(file as Record<string, unknown>)) : [],
+    }));
+  }
+  /** 按当前启用版本的摘要清单读取 Skill 文件正文。 */
+  async readSkillFile(skillKey: string, path: string, refresh = false): Promise<RuntimeSkillFileContent> {
+    if (!skillKey.trim() || !path.trim()) throw new MetisError("INVALID_CONFIG", "skill key and path are required");
+    const query = new URLSearchParams({ app_id: this.appId, skill_key: skillKey, path });
+    const result = await this.get<{ file?: Record<string, unknown>; body?: string }>(`/api/runtime/v1/skill-files?${query.toString()}`, refresh);
+    const body = result.body || "";
+    let decoded: string;
+    try { decoded = atob(body); } catch (error) { throw new MetisError("UPSTREAM_FAILURE", `runtime skill file body is invalid: ${String(error)}`, 502); }
+    return { file: runtimeSkillFile(result.file || {}), body: Uint8Array.from(decoded, (character) => character.charCodeAt(0)) };
+  }
+  /** 调用平台 MCP 的 tools/call，返回工具 result 的 JSON 值。 */
+  async callPlatformMCPTool(name: string, argumentsValue: Record<string, unknown> = {}): Promise<unknown> {
+    name = name.trim();
+    if (!name) throw new MetisError("INVALID_CONFIG", "platform MCP tool name is required");
+    const response = await this.fetcher(new URL("/mcp/v1/platform", this.endpoint), {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${this.token}`, "Content-Type": "application/json", Accept: "application/json",
+        "MCP-Protocol-Version": "2026-07-28", "Mcp-Method": "tools/call", "Mcp-Name": name,
+      },
+      body: JSON.stringify({ jsonrpc: "2.0", id: "metis-sdk-1", method: "tools/call", params: { name, arguments: argumentsValue } }),
+    });
+    let payload: Record<string, unknown> = {};
+    try { payload = await response.json() as Record<string, unknown>; } catch { throw new MetisError("MCP_INVALID_RESPONSE", "platform MCP response is invalid", 502); }
+    if (!response.ok) throw new MetisError(String(payload.reason || "MCP_UPSTREAM_FAILURE"), String(payload.message || "platform MCP request failed"), response.status);
+    if (payload.error && typeof payload.error === "object") throw new MetisError("MCP_ERROR", String((payload.error as Record<string, unknown>).message || "platform MCP tool failed"), 502);
+    if (!("result" in payload)) throw new MetisError("MCP_INVALID_RESPONSE", "platform MCP result is missing", 502);
+    return payload.result;
   }
   private parseModelSlot(slot: string): ModelConfig | null {
     const match = /^(llm|embedding|rerank)\.(\d+)$/.exec(slot);
@@ -231,6 +283,16 @@ export class Client {
     if (this.ttl > 0) this.cache.set(path, { expires: Date.now() + this.ttl, value: body });
     return body as T;
   }
+}
+
+function proto64String(value: unknown, field: string): string {
+  if (value === undefined || value === null || value === "") return "";
+  if (typeof value !== "string") throw new MetisError("UPSTREAM_FAILURE", `runtime field ${field} must be a protobuf 64-bit integer string`, 502);
+  return value;
+}
+
+function runtimeSkillFile(value: Record<string, unknown>): RuntimeSkillFile {
+  return { path: String(value.path || ""), size: proto64String(value.size, "size"), sha256: String(value.sha256 || ""), mediaType: String(value.mediaType || "") };
 }
 
 export function fromEnv(): Client { return new Client(); }
